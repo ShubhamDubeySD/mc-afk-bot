@@ -185,7 +185,6 @@ function scheduleReconnect() {
 
   if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
 
-  // Aternos rate limit se bachne ke liye 20 seconds delay
   console.log('[Bot] Waiting 20s before reconnecting...');
   reconnectTimeoutId = setTimeout(() => {
     reconnectTimeoutId = null;
@@ -197,7 +196,7 @@ function scheduleReconnect() {
 function initializeModules(bot) {
   console.log('[Modules] Initializing features...');
 
-  // Packet keepalive
+  // Packet keepalive - har 5s me swingArm packet bhejega
   addInterval(() => {
     if (bot && botState.connected) {
       try {
@@ -206,7 +205,7 @@ function initializeModules(bot) {
     }
   }, 5000);
 
-  // Chat message + /lagg gc
+  // Chat message aur /lagg gc
   if (config.utils['chat-messages']?.enabled) {
     const messages = config.utils['chat-messages'].messages;
     let i = 0;
@@ -234,7 +233,7 @@ function initializeModules(bot) {
     } catch (e) {}
   }
 
-  // Jump
+  // Random Jump
   if (config.movement?.['random-jump']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -245,7 +244,7 @@ function initializeModules(bot) {
     }, config.movement['random-jump'].interval || 8000);
   }
 
-  // Look
+  // Look Around
   if (config.movement?.['look-around']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -266,3 +265,4 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
+              
