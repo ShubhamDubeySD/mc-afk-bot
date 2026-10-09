@@ -1,5 +1,16 @@
+const http = require('http')
 const mineflayer = require('mineflayer')
 
+// 1. Web Server (Render + UptimeRobot ke liye)
+const PORT = process.env.PORT || 3000
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' })
+  res.end('Aternos AFK Bot 24/7 is Active!')
+}).listen(PORT, () => {
+  console.log(`Web server listening on port ${PORT}`)
+})
+
+// 2. Minecraft Bot
 function createBot() {
   console.log('⚡ Server se connect kar raha hai...')
 
@@ -16,19 +27,26 @@ function createBot() {
   })
 
   bot.on('spawn', () => {
-    console.log('🔥 Bot game ke andar spawn ho gaya! Extreme Anti-AFK Active.')
+    console.log('🔥 Bot game me spawn ho gaya! Anti-AFK & Commands active.')
 
-    // 1. Welcome Message Har 5 Minute me
+    // Welcome Message + /lagg gc (Har 5 Minute me)
     setInterval(() => {
       try {
         bot.chat('Welcome everyone to the server! This server is created by Shubham2652!')
-        console.log('📢 5-Min Welcome message sent!')
+        console.log('📢 Welcome message sent!')
+
+        // Message ke 2 second baad /lagg gc command
+        setTimeout(() => {
+          bot.chat('/lagg gc')
+          console.log('🧹 /lagg gc command executed!')
+        }, 2000)
+
       } catch (err) {
-        console.log('Chat error:', err.message)
+        console.log('Chat/Command error:', err.message)
       }
     }, 5 * 60 * 1000)
 
-    // 2. Extreme 6-Direction Movement Engine
+    // 6-Direction Movement Engine (Survival/Adventure mode me)
     let moveStep = 0
     setInterval(() => {
       bot.clearControlStates()
@@ -40,9 +58,7 @@ function createBot() {
           bot.setControlState('sprint', true)
           bot.setControlState('jump', true)
           bot.swingArm('right')
-          setTimeout(() => {
-            bot.setControlState('sneak', true)
-          }, 1200)
+          setTimeout(() => bot.setControlState('sneak', true), 1200)
           break
 
         case 1: // Backward: Jump + Sneak reset
@@ -50,9 +66,7 @@ function createBot() {
           bot.setControlState('back', true)
           bot.setControlState('jump', true)
           bot.setControlState('sneak', true)
-          setTimeout(() => {
-            bot.setControlState('sneak', false), 800)
-          }, 800)
+          setTimeout(() => bot.setControlState('sneak', false), 800)
           break
 
         case 2: // Right: Strafe Sprint Jump
@@ -87,7 +101,7 @@ function createBot() {
       moveStep = (moveStep + 1) % 6
     }, 2600)
 
-    // 3. Human Look-At Engine
+    // Human Look-At Engine
     setInterval(() => {
       const playerFilter = (entity) => entity.type === 'player' && entity.username !== bot.username
       const player = bot.nearestEntity(playerFilter)
@@ -97,20 +111,14 @@ function createBot() {
     }, 3000)
   })
 
-  bot.on('kicked', (reason) => {
-    console.log('⚠️ Server ne kick kiya:', reason)
-  })
+  bot.on('kicked', (reason) => console.log('⚠️ Server kick:', reason))
+  bot.on('error', (err) => console.log('❌ Error:', err.message))
 
-  bot.on('error', (err) => {
-    console.log('❌ Error aaya:', err.message)
-  })
-
-  // 4. Exact 5 Second Reconnect Logic
+  // Exact 5 Second Reconnect Logic
   bot.on('end', () => {
-    console.log('🔄 Disconnect hua. Theek 5 sec me reconnect kar raha hai...')
+    console.log('🔄 Disconnect hua. Theek 5 sec me reconnect...')
     setTimeout(createBot, 5000)
   })
 }
 
 createBot()
-            
