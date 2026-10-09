@@ -7,7 +7,7 @@
   },
   "server": {
     "ip": "royalsmp13111.aternos.me",
-    "port": 25565,
+    "port": 13111,
     "version": "",
     "try-creative": false
   },
