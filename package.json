@@ -1,0 +1,14 @@
+{
+  "name": "mc-afk-bot",
+  "version": "1.0.0",
+  "description": "Minecraft 24/7 AFK Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mineflayer": "^4.20.1",
+    "mineflayer-pathfinder": "^2.4.5"
+  }
+}
