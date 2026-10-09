@@ -117,11 +117,15 @@ function createBot() {
     }
 
     try {
+      const selectedVersion = (config.server.version && config.server.version.trim() !== '') ? config.server.version : '1.21.1';
+
+      console.log(`[Bot] Initiating connection using protocol version: ${selectedVersion}`);
+
       bot = mineflayer.createBot({
         username: config['bot-account'].username || 'Welcome',
         host: host,
         port: port,
-        version: false,
+        version: selectedVersion,
         checkTimeoutInterval: 120000,
         auth: 'offline',
         keepAlive: true
@@ -132,12 +136,12 @@ function createBot() {
       clearBotTimeouts();
       connectionTimeoutId = setTimeout(() => {
         if (!botState.connected) {
-          console.log('[Bot] Connection timeout - retrying handshake...');
+          console.log('[Bot] Connection timeout - retrying...');
           try { bot.removeAllListeners(); bot.end(); } catch (e) {}
           bot = null;
           scheduleReconnect();
         }
-      }, 180000);
+      }, 120000);
 
       bot.once('login', () => {
         console.log('[Bot] Logged into server, waiting for world spawn...');
@@ -206,7 +210,6 @@ function scheduleReconnect() {
 function initializeModules(bot) {
   console.log('[Modules] Initializing features...');
 
-  // Welcome message + /lagg gc har 5 minute me
   if (config.utils['chat-messages']?.enabled) {
     const messages = config.utils['chat-messages'].messages;
     let i = 0;
@@ -227,7 +230,6 @@ function initializeModules(bot) {
     }, (config.utils['chat-messages']['repeat-delay'] || 300) * 1000);
   }
 
-  // Anti-AFK
   if (config.utils['anti-afk']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -239,7 +241,6 @@ function initializeModules(bot) {
     }
   }
 
-  // Jump and Look Around
   if (config.movement?.['random-jump']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -272,4 +273,3 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-             
