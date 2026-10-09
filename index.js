@@ -132,6 +132,8 @@ function createBot() {
         port: port,
         version: selectedVersion,
         auth: 'offline',
+        viewDistance: 'tiny',
+        hideErrors: true,
         checkTimeoutInterval: 60000,
         keepAlive: true,
         closeTimeout: 60000,
@@ -290,4 +292,3 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-           
