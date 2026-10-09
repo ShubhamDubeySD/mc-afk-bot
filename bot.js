@@ -1,7 +1,7 @@
 const http = require('http')
 const mineflayer = require('mineflayer')
 
-// 1. Web Server (Render + UptimeRobot ke liye)
+// Web Server for Render
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -10,16 +10,19 @@ http.createServer((req, res) => {
   console.log(`Web server listening on port ${PORT}`)
 })
 
-// 2. Minecraft Bot
-function createBot() {
-  console.log('⚡ Server se connect kar raha hai...')
+// Unhandled error se bot band na ho
+process.on('uncaughtException', (err) => {
+  console.log('Caught exception:', err.message)
+})
 
+function createBot() {
+  console.log('⚡ Server se connect karne ki koshish...')
+
+  // Termux wala logic: No dynamic port! Minecraft SRV record khud handle karega.
   const bot = mineflayer.createBot({
     host: 'royalsmp13111.aternos.me',
-    port: 13111,
     username: 'Welcome',
-    checkTimeoutInterval: 60000,
-    version: false
+    checkTimeoutInterval: 60000
   })
 
   bot.on('login', () => {
@@ -35,24 +38,23 @@ function createBot() {
         bot.chat('Welcome everyone to the server! This server is created by Shubham2652!')
         console.log('📢 Welcome message sent!')
 
-        // Message ke 2 second baad /lagg gc command
         setTimeout(() => {
           bot.chat('/lagg gc')
           console.log('🧹 /lagg gc command executed!')
         }, 2000)
 
       } catch (err) {
-        console.log('Chat/Command error:', err.message)
+        console.log('Chat error:', err.message)
       }
     }, 5 * 60 * 1000)
 
-    // 6-Direction Movement Engine (Survival/Adventure mode me)
+    // 6-Direction Movement Engine
     let moveStep = 0
     setInterval(() => {
       bot.clearControlStates()
 
       switch(moveStep) {
-        case 0: // Forward: Sprint + Jump + Sneak
+        case 0:
           bot.look(0, 0, true)
           bot.setControlState('forward', true)
           bot.setControlState('sprint', true)
@@ -61,7 +63,7 @@ function createBot() {
           setTimeout(() => bot.setControlState('sneak', true), 1200)
           break
 
-        case 1: // Backward: Jump + Sneak reset
+        case 1:
           bot.look(0, 0, true)
           bot.setControlState('back', true)
           bot.setControlState('jump', true)
@@ -69,27 +71,27 @@ function createBot() {
           setTimeout(() => bot.setControlState('sneak', false), 800)
           break
 
-        case 2: // Right: Strafe Sprint Jump
+        case 2:
           bot.look(Math.PI / 2, 0, true)
           bot.setControlState('right', true)
           bot.setControlState('sprint', true)
           bot.setControlState('jump', true)
           break
 
-        case 3: // Left: Strafe Jump + Crouch
+        case 3:
           bot.look(-Math.PI / 2, 0, true)
           bot.setControlState('left', true)
           bot.setControlState('jump', true)
           bot.setControlState('sneak', true)
           break
 
-        case 4: // Vertical UP: Sky look + Jump
+        case 4:
           bot.look(bot.entity.yaw, -Math.PI / 2, true)
           bot.setControlState('jump', true)
           bot.swingArm('right')
           break
 
-        case 5: // Vertical DOWN: Ground look + Sneak spam
+        case 5:
           bot.look(bot.entity.yaw, Math.PI / 2, true)
           bot.setControlState('sneak', true)
           setTimeout(() => bot.setControlState('sneak', false), 250)
@@ -111,13 +113,17 @@ function createBot() {
     }, 3000)
   })
 
-  bot.on('kicked', (reason) => console.log('⚠️ Server kick:', reason))
-  bot.on('error', (err) => console.log('❌ Error:', err.message))
+  bot.on('kicked', (reason) => {
+    console.log('⚠️ Server kick:', reason)
+  })
 
-  // Exact 5 Second Reconnect Logic
+  bot.on('error', (err) => {
+    console.log('❌ Connection error:', err.message)
+  })
+
   bot.on('end', () => {
-    console.log('🔄 Disconnect hua. Theek 5 sec me reconnect...')
-    setTimeout(createBot, 5000)
+    console.log('🔄 Disconnect hua. Theek 10 sec me dobara connect karega...')
+    setTimeout(createBot, 10000)
   })
 }
 
