@@ -1,0 +1,86 @@
+{
+  "name": "AFK Bot",
+  "bot-account": {
+    "username": "Welcome",
+    "password": "",
+    "type": "offline"
+  },
+  "server": {
+    "ip": "royalsmp13111.aternos.me",
+    "port": 25565,
+    "version": "",
+    "try-creative": false
+  },
+  "position": {
+    "enabled": false,
+    "x": 0,
+    "y": 100,
+    "z": 0
+  },
+  "utils": {
+    "auto-auth": {
+      "enabled": false,
+      "password": ""
+    },
+    "anti-afk": {
+      "enabled": true,
+      "sneak": true
+    },
+    "chat-messages": {
+      "enabled": true,
+      "repeat": true,
+      "repeat-delay": 300,
+      "messages": [
+        "Welcome everyone to the server! This server is created by Shubham2652!"
+      ]
+    },
+    "chat-log": true,
+    "auto-reconnect": true,
+    "auto-reconnect-delay": 5000,
+    "max-reconnect-delay": 30000
+  },
+  "movement": {
+    "enabled": true,
+    "circle-walk": {
+      "enabled": false,
+      "radius": 4,
+      "speed": 3000
+    },
+    "look-around": {
+      "enabled": true,
+      "interval": 4000
+    },
+    "random-jump": {
+      "enabled": true,
+      "interval": 8000
+    }
+  },
+  "modules": {
+    "avoidMobs": true,
+    "combat": false,
+    "beds": false,
+    "chat": true,
+    "console-commands": true
+  },
+  "combat": {
+    "attack-mobs": false,
+    "auto-eat": false
+  },
+  "beds": {
+    "pick-up-day": false,
+    "place-night": false
+  },
+  "discord": {
+    "enabled": false,
+    "webhookUrl": "",
+    "events": {
+      "connect": false,
+      "disconnect": false,
+      "chat": false
+    }
+  },
+  "chat": {
+    "respond": false,
+    "tpWhitelist": []
+  }
+}
