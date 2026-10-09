@@ -1,7 +1,7 @@
 {
   "name": "AFK Bot",
   "server": {
-    "ip": "royalsmp13111.aternos.me",
+    "ip": "boafish.aternos.host",
     "port": 13111,
     "version": "1.21.1"
   },
