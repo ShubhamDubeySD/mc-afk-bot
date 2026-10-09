@@ -1,0 +1,34 @@
+{
+  "name": "AFK Bot",
+  "server": {
+    "ip": "royalsmp13111.aternos.me",
+    "port": 13111,
+    "version": "1.21.1"
+  },
+  "bot-account": {
+    "username": "Welcome"
+  },
+  "utils": {
+    "anti-afk": {
+      "enabled": true,
+      "sneak": true
+    },
+    "chat-messages": {
+      "enabled": true,
+      "repeat-delay": 300,
+      "messages": [
+        "Welcome everyone to the server! This server is created by Shubham2652!"
+      ]
+    }
+  },
+  "movement": {
+    "random-jump": {
+      "enabled": true,
+      "interval": 8000
+    },
+    "look-around": {
+      "enabled": true,
+      "interval": 4000
+    }
+  }
+}
