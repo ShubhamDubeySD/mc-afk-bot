@@ -87,19 +87,24 @@ function addInterval(callback, delay) {
   return id;
 }
 
+// Custom direct DNS resolver without system caching
 function resolveServer(callback) {
-  const srvHost = `_minecraft._tcp.${config.server.ip}`;
-  console.log(`[DNS] Checking SRV record for ${srvHost}...`);
+  const cleanHost = config.server.ip.replace(/:\d+$/, '').trim();
+  const srvHost = `_minecraft._tcp.${cleanHost}`;
+  console.log(`[DNS] Checking live SRV record for ${srvHost}...`);
 
-  dns.resolveSrv(srvHost, (err, addresses) => {
+  const resolver = new dns.Resolver();
+  resolver.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+
+  resolver.resolveSrv(srvHost, (err, addresses) => {
     if (!err && addresses && addresses.length > 0) {
       const targetHost = addresses[0].name;
       const targetPort = addresses[0].port;
-      console.log(`[DNS] Resolved: ${targetHost}:${targetPort}`);
+      console.log(`[DNS] Live resolved via SRV: ${targetHost}:${targetPort}`);
       callback(targetHost, targetPort);
     } else {
-      console.log(`[DNS] Fallback direct: ${config.server.ip}:${config.server.port}`);
-      callback(config.server.ip, Number(config.server.port) || 13111);
+      console.log(`[DNS] Fallback direct: ${cleanHost}:${config.server.port}`);
+      callback(cleanHost, Number(config.server.port) || 13111);
     }
   });
 }
@@ -220,14 +225,14 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
-  // Socket alive rakhne ke liye swing arm
+  // Socket keepalive
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
   }, 5000);
 
-  // Welcome message har 5 minute me + turant baad /lagg gc
+  // Welcome message + /lagg gc
   if (config.utils['chat-messages']?.enabled) {
     const messages = config.utils['chat-messages'].messages;
     let i = 0;
@@ -236,7 +241,6 @@ function initializeModules(bot) {
         bot.chat(messages[i]);
         console.log(`[Chat] Sent: ${messages[i]}`);
 
-        // 2 second baad /lagg gc command
         setTimeout(() => {
           if (bot && botState.connected) {
             bot.chat('/lagg gc');
@@ -286,4 +290,4 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-      
+           
