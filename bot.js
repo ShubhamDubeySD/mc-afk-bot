@@ -1,7 +1,7 @@
 const http = require('http')
+const dns = require('dns')
 const mineflayer = require('mineflayer')
 
-// Web Server for Render
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -10,7 +10,6 @@ http.createServer((req, res) => {
   console.log(`Web server listening on port ${PORT}`)
 })
 
-// Uncaught exceptions handle karein
 process.on('uncaughtException', (err) => {
   console.log('Caught exception:', err.message)
 })
@@ -18,146 +17,129 @@ process.on('uncaughtException', (err) => {
 let bot = null
 let reconnectTimer = null
 
-function createBot() {
+function connectBot() {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
     reconnectTimer = null
   }
 
-  console.log('⚡ Server se connect karne ki koshish...')
+  console.log('🔍 Aternos server dynamic IP & Port fetch ho raha hai...')
 
-  // checkTimeoutInterval 0 karne se Aternos ka timeout issue solve ho jata hai
-  bot = mineflayer.createBot({
-    host: 'royalsmp13111.aternos.me',
-    username: 'Welcome',
-    checkTimeoutInterval: 0
+  // SRV Record se live port aur host resolve karein
+  dns.resolveSrv('_minecraft._tcp.royalsmp13111.aternos.me', (err, addresses) => {
+    let host = 'royalsmp13111.aternos.me'
+    let port = 25565
+
+    if (!err && addresses && addresses.length > 0) {
+      host = addresses[0].name
+      port = addresses[0].port
+      console.log(`🎯 Resolved live server: ${host}:${port}`)
+    } else {
+      console.log('⚠️ SRV record fetch nahi hua, domain se direct koshish kar rahe hain...')
+    }
+
+    try {
+      bot = mineflayer.createBot({
+        host: host,
+        port: port,
+        username: 'Welcome',
+        checkTimeoutInterval: 0
+      })
+
+      setupBotEvents(bot)
+    } catch (e) {
+      console.log('Bot creation error:', e.message)
+      scheduleReconnect()
+    }
   })
+}
 
+function setupBotEvents(botInstance) {
   let msgInterval = null
   let moveInterval = null
   let lookInterval = null
 
-  bot.on('login', () => {
+  botInstance.on('login', () => {
     console.log('✅ Bot login ho gaya!')
   })
 
-  bot.on('spawn', () => {
-    console.log('🔥 Bot game me spawn ho gaya! Anti-AFK & Commands active.')
+  botInstance.on('spawn', () => {
+    console.log('🔥 Bot spawn hua! Anti-AFK engine active.')
 
-    // Welcome Message + /lagg gc (Har 5 Minute me)
+    // Welcome Message + /lagg gc
     msgInterval = setInterval(() => {
       try {
-        bot.chat('Welcome everyone to the server! This server is created by Shubham2652!')
-        console.log('📢 Welcome message sent!')
-
+        botInstance.chat('Welcome everyone to the server! This server is created by Shubham2652!')
         setTimeout(() => {
-          try {
-            bot.chat('/lagg gc')
-            console.log('🧹 /lagg gc command executed!')
-          } catch (e) {}
+          try { botInstance.chat('/lagg gc') } catch (e) {}
         }, 2000)
-
-      } catch (err) {
-        console.log('Chat error:', err.message)
-      }
+      } catch (err) {}
     }, 5 * 60 * 1000)
 
-    // 6-Direction Movement Engine
+    // 6-Direction Anti-AFK
     let moveStep = 0
     moveInterval = setInterval(() => {
       try {
-        bot.clearControlStates()
-
+        botInstance.clearControlStates()
         switch(moveStep) {
           case 0:
-            bot.look(0, 0, true)
-            bot.setControlState('forward', true)
-            bot.setControlState('sprint', true)
-            bot.setControlState('jump', true)
-            bot.swingArm('right')
-            setTimeout(() => { try { bot.setControlState('sneak', true) } catch (e) {} }, 1200)
+            botInstance.setControlState('forward', true)
+            botInstance.setControlState('sprint', true)
+            botInstance.setControlState('jump', true)
+            botInstance.swingArm('right')
             break
-
           case 1:
-            bot.look(0, 0, true)
-            bot.setControlState('back', true)
-            bot.setControlState('jump', true)
-            bot.setControlState('sneak', true)
-            setTimeout(() => { try { bot.setControlState('sneak', false) } catch (e) {} }, 800)
+            botInstance.setControlState('back', true)
+            botInstance.setControlState('sneak', true)
             break
-
           case 2:
-            bot.look(Math.PI / 2, 0, true)
-            bot.setControlState('right', true)
-            bot.setControlState('sprint', true)
-            bot.setControlState('jump', true)
+            botInstance.setControlState('right', true)
             break
-
           case 3:
-            bot.look(-Math.PI / 2, 0, true)
-            bot.setControlState('left', true)
-            bot.setControlState('jump', true)
-            bot.setControlState('sneak', true)
+            botInstance.setControlState('left', true)
             break
-
           case 4:
-            if (bot.entity) {
-              bot.look(bot.entity.yaw, -Math.PI / 2, true)
-              bot.setControlState('jump', true)
-              bot.swingArm('right')
-            }
+            botInstance.setControlState('jump', true)
+            botInstance.swingArm('right')
             break
-
           case 5:
-            if (bot.entity) {
-              bot.look(bot.entity.yaw, Math.PI / 2, true)
-              bot.setControlState('sneak', true)
-              setTimeout(() => { try { bot.setControlState('sneak', false) } catch (e) {} }, 250)
-              setTimeout(() => { try { bot.setControlState('sneak', true) } catch (e) {} }, 500)
-              setTimeout(() => { try { bot.setControlState('sneak', false) } catch (e) {} }, 750)
-            }
+            botInstance.setControlState('sneak', true)
+            setTimeout(() => { try { botInstance.setControlState('sneak', false) } catch (e) {} }, 400)
             break
         }
-
         moveStep = (moveStep + 1) % 6
       } catch (e) {}
-    }, 2600)
+    }, 2500)
 
-    // Player Look-At Engine
+    // Look at players
     lookInterval = setInterval(() => {
       try {
-        const playerFilter = (entity) => entity.type === 'player' && entity.username !== bot.username
-        const player = bot.nearestEntity(playerFilter)
-        if (player) {
-          bot.lookAt(player.position.offset(0, player.height, 0))
-        }
+        const player = botInstance.nearestEntity(e => e.type === 'player' && e.username !== botInstance.username)
+        if (player) botInstance.lookAt(player.position.offset(0, player.height, 0))
       } catch (e) {}
     }, 3000)
   })
 
-  function cleanupAndReconnect() {
+  function cleanup() {
     clearInterval(msgInterval)
     clearInterval(moveInterval)
     clearInterval(lookInterval)
-
-    if (!reconnectTimer) {
-      console.log('🔄 10 sec me bot dobara connect karega...')
-      reconnectTimer = setTimeout(createBot, 10000)
-    }
+    scheduleReconnect()
   }
 
-  bot.on('kicked', (reason) => {
-    console.log('⚠️ Server kick:', reason)
-  })
-
-  bot.on('error', (err) => {
-    console.log('❌ Connection error:', err.message)
-  })
-
-  bot.on('end', () => {
-    console.log('🔌 Disconnect hua.')
-    cleanupAndReconnect()
+  botInstance.on('kicked', (reason) => console.log('Kick reason:', reason))
+  botInstance.on('error', (err) => console.log('Error:', err.message))
+  botInstance.on('end', () => {
+    console.log('🔌 Disconnected.')
+    cleanup()
   })
 }
 
-createBot()
+function scheduleReconnect() {
+  if (!reconnectTimer) {
+    console.log('⏳ 15 sec me reconnect try karega...')
+    reconnectTimer = setTimeout(connectBot, 15000)
+  }
+}
+
+connectBot()
