@@ -1,12 +1,11 @@
 'use strict';
 
+const dns = require('dns');
 const mineflayer = require('mineflayer');
 const { Movements, pathfinder, goals } = require('mineflayer-pathfinder');
 const { GoalBlock } = goals;
 const config = require('./settings.json');
 const express = require('express');
-const http = require('http');
-const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,9 +20,7 @@ let botState = {
   connected: false,
   lastActivity: Date.now(),
   reconnectAttempts: 0,
-  startTime: Date.now(),
-  errors: [],
-  wasThrottled: false
+  startTime: Date.now()
 };
 
 function formatUptime(seconds) {
@@ -31,13 +28,6 @@ function formatUptime(seconds) {
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   return `${h}h ${m}m ${s}s`;
-}
-
-function pushError(entry) {
-  botState.errors.push(entry);
-  if (botState.errors.length > 100) {
-    botState.errors = botState.errors.slice(-50);
-  }
 }
 
 app.get('/', (req, res) => {
@@ -84,15 +74,14 @@ app.get('/health', (req, res) => {
     uptime: Math.floor((Date.now() - botState.startTime) / 1000),
     coords: (bot && bot.entity) ? bot.entity.position : null,
     lastActivity: botState.lastActivity,
-    reconnectAttempts: botState.reconnectAttempts,
-    memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024
+    reconnectAttempts: botState.reconnectAttempts
   });
 });
 
 app.get('/ping', (req, res) => res.send('pong'));
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Server] HTTP server started on port ${server.address().port}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[Server] HTTP server started on port ${PORT}`);
 });
 
 function clearBotTimeouts() {
@@ -111,11 +100,6 @@ function addInterval(callback, delay) {
   return id;
 }
 
-function getReconnectDelay() {
-  const baseDelay = config.utils['auto-reconnect-delay'] || 5000;
-  return baseDelay;
-}
-
 function createBot() {
   if (isReconnecting) return;
 
@@ -125,76 +109,81 @@ function createBot() {
     bot = null;
   }
 
-  console.log(`[Bot] Connecting to ${config.server.ip}:${config.server.port}`);
+  const srvHost = `_minecraft._tcp.${config.server.ip}`;
+  console.log(`[DNS] Resolving SRV records for ${srvHost}...`);
 
-  try {
-    const botVersion = config.server.version && config.server.version.trim() !== '' ? config.server.version : false;
+  dns.resolveSrv(srvHost, (err, addresses) => {
+    let host = config.server.ip;
+    let port = config.server.port || 25565;
 
-    bot = mineflayer.createBot({
-      username: config['bot-account'].username,
-      host: config.server.ip,
-      port: config.server.port,
-      version: botVersion,
-      hideErrors: false,
-      checkTimeoutInterval: 0
-    });
+    if (!err && addresses && addresses.length > 0) {
+      host = addresses[0].name;
+      port = addresses[0].port;
+      console.log(`[DNS] Found live backend: ${host}:${port}`);
+    } else {
+      console.log(`[DNS] SRV not found, trying direct: ${host}:${port}`);
+    }
 
-    bot.loadPlugin(pathfinder);
+    try {
+      bot = mineflayer.createBot({
+        username: config['bot-account'].username,
+        host: host,
+        port: port,
+        hideErrors: false,
+        checkTimeoutInterval: 60000
+      });
 
-    clearBotTimeouts();
-    connectionTimeoutId = setTimeout(() => {
-      if (!botState.connected) {
-        console.log('[Bot] Connection timeout - no spawn received');
-        try { bot.removeAllListeners(); bot.end(); } catch (e) {}
-        bot = null;
-        scheduleReconnect();
-      }
-    }, 120000);
-
-    let spawnHandled = false;
-
-    bot.once('spawn', () => {
-      if (spawnHandled) return;
-      spawnHandled = true;
+      bot.loadPlugin(pathfinder);
 
       clearBotTimeouts();
-      botState.connected = true;
-      botState.lastActivity = Date.now();
-      botState.reconnectAttempts = 0;
-      isReconnecting = false;
+      connectionTimeoutId = setTimeout(() => {
+        if (!botState.connected) {
+          console.log('[Bot] Connection timeout - no spawn received');
+          try { bot.removeAllListeners(); bot.end(); } catch (e) {}
+          bot = null;
+          scheduleReconnect();
+        }
+      }, 60000);
 
-      console.log(`[Bot] Spawned on server (version: ${bot.version})`);
+      bot.once('spawn', () => {
+        clearBotTimeouts();
+        botState.connected = true;
+        botState.lastActivity = Date.now();
+        botState.reconnectAttempts = 0;
+        isReconnecting = false;
 
-      const mcData = require('minecraft-data')(bot.version);
-      const defaultMove = new Movements(bot, mcData);
-      defaultMove.allowFreeMotion = false;
-      defaultMove.canDig = false;
+        console.log(`[Bot] Spawned on server! Bot username: ${bot.username}`);
 
-      initializeModules(bot, mcData, defaultMove);
-    });
+        const mcData = require('minecraft-data')(bot.version);
+        const defaultMove = new Movements(bot, mcData);
+        defaultMove.allowFreeMotion = false;
+        defaultMove.canDig = false;
 
-    bot.on('kicked', (reason) => {
-      console.log(`[Bot] Kicked: ${JSON.stringify(reason)}`);
-      botState.connected = false;
-      clearAllIntervals();
-    });
+        initializeModules(bot);
+      });
 
-    bot.on('end', (reason) => {
-      console.log(`[Bot] Disconnected: ${reason || 'Unknown'}`);
-      botState.connected = false;
-      clearAllIntervals();
-      spawnHandled = false;
+      bot.on('kicked', (reason) => {
+        console.log(`[Bot] Kicked: ${JSON.stringify(reason)}`);
+        botState.connected = false;
+        clearAllIntervals();
+      });
+
+      bot.on('end', (reason) => {
+        console.log(`[Bot] Disconnected: ${reason || 'Unknown'}`);
+        botState.connected = false;
+        clearAllIntervals();
+        scheduleReconnect();
+      });
+
+      bot.on('error', (err) => {
+        console.log(`[Bot] Error: ${err.message}`);
+      });
+
+    } catch (err) {
+      console.log(`[Bot] Failed to create bot: ${err.message}`);
       scheduleReconnect();
-    });
-
-    bot.on('error', (err) => {
-      console.log(`[Bot] Error: ${err.message}`);
-    });
-
-  } catch (err) {
-    console.log(`[Bot] Failed to create bot: ${err.message}`);
-    scheduleReconnect();
-  }
+    }
+  });
 }
 
 function scheduleReconnect() {
@@ -204,17 +193,15 @@ function scheduleReconnect() {
   isReconnecting = true;
   botState.reconnectAttempts++;
 
-  const delay = getReconnectDelay();
-  console.log(`[Bot] Reconnecting in ${delay / 1000}s`);
-
+  console.log('[Bot] Reconnecting in 10s...');
   reconnectTimeoutId = setTimeout(() => {
     reconnectTimeoutId = null;
     isReconnecting = false;
     createBot();
-  }, delay);
+  }, 10000);
 }
 
-function initializeModules(bot, mcData, defaultMove) {
+function initializeModules(bot) {
   console.log('[Modules] Initializing...');
 
   // Welcome message + /lagg gc har 5 minute me
@@ -235,10 +222,10 @@ function initializeModules(bot, mcData, defaultMove) {
 
         i = (i + 1) % messages.length;
       }
-    }, config.utils['chat-messages']['repeat-delay'] * 1000);
+    }, (config.utils['chat-messages']['repeat-delay'] || 300) * 1000);
   }
 
-  // Anti-AFK engine (actions)
+  // Anti-AFK
   if (config.utils['anti-afk']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -258,7 +245,7 @@ function initializeModules(bot, mcData, defaultMove) {
         bot.setControlState('jump', true);
         setTimeout(() => { if (bot) bot.setControlState('jump', false); }, 300);
       } catch (e) {}
-    }, config.movement['random-jump'].interval);
+    }, config.movement['random-jump'].interval || 8000);
   }
 
   if (config.movement?.['look-around']?.enabled) {
@@ -269,7 +256,7 @@ function initializeModules(bot, mcData, defaultMove) {
         const pitch = (Math.random() * Math.PI / 2) - Math.PI / 4;
         bot.look(yaw, pitch, false);
       } catch (e) {}
-    }, config.movement['look-around'].interval);
+    }, config.movement['look-around'].interval || 4000);
   }
 
   console.log('[Modules] All modules initialized.');
@@ -283,4 +270,3 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-            
