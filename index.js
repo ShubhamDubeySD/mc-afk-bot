@@ -27,7 +27,7 @@ app.get('/', (req, res) => {
     <!DOCTYPE html>
     <html lang="en">
       <head>
-        <title>${config.name} Dashboard</title>
+        <title>${config.name || 'AFK Bot'} Dashboard</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
@@ -39,10 +39,10 @@ app.get('/', (req, res) => {
       </head>
       <body>
         <div class="container">
-          <h2>${config.name}</h2>
+          <h2>${config.name || 'AFK Bot'}</h2>
           <div class="card"><div>Status</div><div class="val" id="st">Loading...</div></div>
           <div class="card"><div>Uptime</div><div class="val" id="up">0s</div></div>
-          <div class="card"><div>Server</div><div class="val" style="font-size:1rem;">${config.server.ip}</div></div>
+          <div class="card"><div>Server</div><div class="val" style="font-size:1rem;">${config.server?.ip || 'royalsmp13111.aternos.me'}</div></div>
         </div>
         <script>
           async function update() {
@@ -87,9 +87,9 @@ function addInterval(callback, delay) {
   return id;
 }
 
-// Custom direct DNS resolver forcing proper IPv4 and SRV handling
 function resolveServer(callback) {
-  const cleanHost = config.server.ip.replace(/:\d+$/, '').trim().toLowerCase();
+  const rawHost = config.server?.ip || 'royalsmp13111.aternos.me';
+  const cleanHost = rawHost.replace(/:\d+$/, '').trim().toLowerCase();
   const srvHost = `_minecraft._tcp.${cleanHost}`;
   console.log(`[DNS] Checking live SRV record for ${srvHost}...`);
 
@@ -104,14 +104,14 @@ function resolveServer(callback) {
 
       resolver.resolve4(srvTarget, (err4, ips) => {
         const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : srvTarget;
-        console.log(`[DNS] Connecting to IP: ${directIp}:${srvPort} (Virtual Host: ${cleanHost})`);
+        console.log(`[DNS] Resolved target: ${directIp}:${srvPort} with virtual host: ${cleanHost}`);
         callback(directIp, srvPort, cleanHost);
       });
     } else {
-      console.log(`[DNS] Fallback direct domain: ${cleanHost}:${config.server.port || 13111}`);
+      console.log(`[DNS] Fallback direct domain: ${cleanHost}:${config.server?.port || 13111}`);
       resolver.resolve4(cleanHost, (err4, ips) => {
         const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : cleanHost;
-        callback(directIp, Number(config.server.port) || 13111, cleanHost);
+        callback(directIp, Number(config.server?.port) || 13111, cleanHost);
       });
     }
   });
@@ -130,20 +130,19 @@ function createBot() {
   }
 
   resolveServer((connectHost, port, virtualHost) => {
-    const selectedVersion = config.server.version || '1.21.1';
-    console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost}, Version: ${selectedVersion})...`);
+    console.log(`[Bot] Initiating connection to ${connectHost}:${port} (Virtual Host: ${virtualHost})...`);
 
     try {
       bot = mineflayer.createBot({
-        username: config['bot-account'].username || 'Welcome',
+        username: config['bot-account']?.username || 'Welcome',
         host: connectHost,
         port: port,
         fakeHost: virtualHost,
-        version: selectedVersion,
+        version: false, // Auto-negotiates protocol version with PaperMC
         auth: 'offline',
         viewDistance: 'tiny',
         hideErrors: false,
-        connectTimeout: 20000,
+        connectTimeout: 30000,
         checkTimeoutInterval: 60000,
         keepAlive: true,
         closeTimeout: 60000,
@@ -155,13 +154,13 @@ function createBot() {
       if (connectWatchdogId) clearTimeout(connectWatchdogId);
       connectWatchdogId = setTimeout(() => {
         if (!botState.connected) {
-          console.log('[Bot] Handshake watchdog triggered. Retrying...');
+          console.log('[Bot] Handshake watchdog timeout. Reconnecting...');
           cleanupAndReconnect();
         }
-      }, 25000);
+      }, 35000);
 
       bot.once('login', () => {
-        console.log('[Bot] Handshake verified, logging in...');
+        console.log('[Bot] Handshake verified, logged in!');
       });
 
       bot.once('spawn', () => {
@@ -237,15 +236,13 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
-  // Socket keepalive
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
   }, 5000);
 
-  // Welcome message + /lagg gc
-  if (config.utils['chat-messages']?.enabled) {
+  if (config.utils?.['chat-messages']?.enabled) {
     const messages = config.utils['chat-messages'].messages;
     let i = 0;
     addInterval(() => {
@@ -265,12 +262,10 @@ function initializeModules(bot) {
     }, (config.utils['chat-messages']['repeat-delay'] || 300) * 1000);
   }
 
-  // Sneak mode
-  if (config.utils['anti-afk']?.enabled && config.utils['anti-afk'].sneak) {
+  if (config.utils?.['anti-afk']?.enabled && config.utils['anti-afk'].sneak) {
     try { bot.setControlState('sneak', true); } catch (e) {}
   }
 
-  // Jump animation
   if (config.movement?.['random-jump']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -281,7 +276,6 @@ function initializeModules(bot) {
     }, config.movement['random-jump'].interval || 8000);
   }
 
-  // Look around
   if (config.movement?.['look-around']?.enabled) {
     addInterval(() => {
       if (!bot || !botState.connected) return;
@@ -290,16 +284,4 @@ function initializeModules(bot) {
         const pitch = (Math.random() * Math.PI / 2) - Math.PI / 4;
         bot.look(yaw, pitch, false);
       } catch (e) {}
-    }, config.movement['look-around'].interval || 4000);
-  }
-
-  console.log('[Modules] All automation active.');
-}
-
-process.on('uncaughtException', (err) => {
-  console.log(`[FATAL] Uncaught: ${err.message}`);
-  cleanupAndReconnect();
-});
-
-createBot();
-  
+    }, config
