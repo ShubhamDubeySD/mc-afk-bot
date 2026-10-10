@@ -87,35 +87,31 @@ function addInterval(callback, delay) {
   return id;
 }
 
-// Custom direct DNS resolver forcing IPv4 on Render
+// Custom direct DNS resolver forcing proper IPv4 and SRV handling
 function resolveServer(callback) {
-  const cleanHost = config.server.ip.replace(/:\d+$/, '').trim();
+  const cleanHost = config.server.ip.replace(/:\d+$/, '').trim().toLowerCase();
   const srvHost = `_minecraft._tcp.${cleanHost}`;
   console.log(`[DNS] Checking live SRV record for ${srvHost}...`);
 
   const resolver = new dns.Resolver();
-  resolver.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+  resolver.setServers(['8.8.8.8', '1.1.1.1']);
 
   resolver.resolveSrv(srvHost, (err, addresses) => {
     if (!err && addresses && addresses.length > 0) {
-      const targetHost = addresses[0].name;
-      const targetPort = addresses[0].port;
-      console.log(`[DNS] Live resolved via SRV: ${targetHost}:${targetPort}`);
+      const srvTarget = addresses[0].name.toLowerCase();
+      const srvPort = addresses[0].port;
+      console.log(`[DNS] Live resolved via SRV: ${srvTarget}:${srvPort}`);
 
-      // Resolve domain directly to IPv4 to bypass Render cloud DNS hangs
-      resolver.resolve4(targetHost, (err4, ips) => {
-        if (!err4 && ips && ips.length > 0) {
-          console.log(`[DNS] Resolved IPv4: ${ips[0]}:${targetPort}`);
-          callback(ips[0], targetPort);
-        } else {
-          callback(targetHost, targetPort);
-        }
+      resolver.resolve4(srvTarget, (err4, ips) => {
+        const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : srvTarget;
+        console.log(`[DNS] Connecting to IP: ${directIp}:${srvPort} (Virtual Host: ${cleanHost})`);
+        callback(directIp, srvPort, cleanHost);
       });
     } else {
-      console.log(`[DNS] Fallback direct: ${cleanHost}:${config.server.port}`);
+      console.log(`[DNS] Fallback direct domain: ${cleanHost}:${config.server.port || 13111}`);
       resolver.resolve4(cleanHost, (err4, ips) => {
         const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : cleanHost;
-        callback(directIp, Number(config.server.port) || 13111);
+        callback(directIp, Number(config.server.port) || 13111, cleanHost);
       });
     }
   });
@@ -133,19 +129,20 @@ function createBot() {
     bot = null;
   }
 
-  resolveServer((host, port) => {
+  resolveServer((connectHost, port, virtualHost) => {
     const selectedVersion = config.server.version || '1.21.1';
-    console.log(`[Bot] Connecting to ${host}:${port} (${selectedVersion})...`);
+    console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost}, Version: ${selectedVersion})...`);
 
     try {
       bot = mineflayer.createBot({
         username: config['bot-account'].username || 'Welcome',
-        host: host,
+        host: connectHost,
         port: port,
+        fakeHost: virtualHost,
         version: selectedVersion,
         auth: 'offline',
         viewDistance: 'tiny',
-        hideErrors: true,
+        hideErrors: false,
         connectTimeout: 20000,
         checkTimeoutInterval: 60000,
         keepAlive: true,
@@ -158,7 +155,7 @@ function createBot() {
       if (connectWatchdogId) clearTimeout(connectWatchdogId);
       connectWatchdogId = setTimeout(() => {
         if (!botState.connected) {
-          console.log('[Bot] Handshake timeout. Retrying...');
+          console.log('[Bot] Handshake watchdog triggered. Retrying...');
           cleanupAndReconnect();
         }
       }, 25000);
@@ -305,3 +302,4 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
+  
