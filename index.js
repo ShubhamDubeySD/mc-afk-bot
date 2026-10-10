@@ -98,21 +98,13 @@ function resolveServer(callback) {
 
   resolver.resolveSrv(srvHost, (err, addresses) => {
     if (!err && addresses && addresses.length > 0) {
-      const srvTarget = addresses[0].name.toLowerCase();
       const srvPort = addresses[0].port;
-      console.log(`[DNS] Live resolved via SRV: ${srvTarget}:${srvPort}`);
-
-      resolver.resolve4(srvTarget, (err4, ips) => {
-        const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : srvTarget;
-        console.log(`[DNS] Target IP: ${directIp}:${srvPort} (Virtual Host: ${cleanHost})`);
-        callback(directIp, srvPort, cleanHost);
-      });
+      console.log(`[DNS] Live resolved port via SRV: ${srvPort}`);
+      callback(cleanHost, srvPort);
     } else {
-      console.log(`[DNS] Fallback direct domain: ${cleanHost}:${config.server?.port || 13111}`);
-      resolver.resolve4(cleanHost, (err4, ips) => {
-        const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : cleanHost;
-        callback(directIp, Number(config.server?.port) || 13111, cleanHost);
-      });
+      const fallbackPort = Number(config.server?.port) || 13111;
+      console.log(`[DNS] Fallback port: ${fallbackPort}`);
+      callback(cleanHost, fallbackPort);
     }
   });
 }
@@ -129,16 +121,15 @@ function createBot() {
     bot = null;
   }
 
-  resolveServer((connectHost, port, virtualHost) => {
+  resolveServer((domainHost, targetPort) => {
     const selectedVersion = '1.21.4';
-    console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost}, Version: ${selectedVersion})...`);
+    console.log(`[Bot] Connecting to ${domainHost}:${targetPort} (Version: ${selectedVersion})...`);
 
     try {
       bot = mineflayer.createBot({
         username: config['bot-account']?.username || 'Welcome',
-        host: connectHost,
-        port: port,
-        fakeHost: virtualHost,
+        host: domainHost,
+        port: targetPort,
         version: selectedVersion,
         auth: 'offline',
         viewDistance: 'tiny',
@@ -302,3 +293,4 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
+        
