@@ -1,5 +1,9 @@
 name: Run AFK Bot
 
+concurrency:
+  group: mc-bot
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   schedule:
