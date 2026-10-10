@@ -130,7 +130,8 @@ function createBot() {
   }
 
   resolveServer((connectHost, port, virtualHost) => {
-    console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost})...`);
+    const selectedVersion = config.server?.version || '1.21.4';
+    console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost}, Version: ${selectedVersion})...`);
 
     try {
       bot = mineflayer.createBot({
@@ -138,7 +139,7 @@ function createBot() {
         host: connectHost,
         port: port,
         fakeHost: virtualHost,
-        version: false,
+        version: selectedVersion,
         auth: 'offline',
         viewDistance: 'tiny',
         hideErrors: false,
@@ -301,4 +302,4 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-  
+      
