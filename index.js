@@ -130,7 +130,7 @@ function createBot() {
   }
 
   resolveServer((connectHost, port, virtualHost) => {
-    const selectedVersion = config.server?.version || '1.21.4';
+    const selectedVersion = '1.21.4';
     console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost}, Version: ${selectedVersion})...`);
 
     try {
@@ -161,7 +161,7 @@ function createBot() {
       }, 35000);
 
       bot.once('login', () => {
-        console.log('[Bot] Logged in successfully!');
+        console.log('[Bot] Handshake verified, logged in successfully!');
       });
 
       bot.once('spawn', () => {
@@ -302,4 +302,3 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-      
