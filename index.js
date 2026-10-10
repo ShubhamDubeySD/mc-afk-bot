@@ -7,7 +7,7 @@ const config = require('./settings.json');
 const express = require('express');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 let bot = null;
 let activeIntervals = [];
@@ -87,7 +87,7 @@ function addInterval(callback, delay) {
   return id;
 }
 
-// Custom direct DNS resolver without system caching
+// Custom direct DNS resolver forcing IPv4 on Render
 function resolveServer(callback) {
   const cleanHost = config.server.ip.replace(/:\d+$/, '').trim();
   const srvHost = `_minecraft._tcp.${cleanHost}`;
@@ -101,10 +101,22 @@ function resolveServer(callback) {
       const targetHost = addresses[0].name;
       const targetPort = addresses[0].port;
       console.log(`[DNS] Live resolved via SRV: ${targetHost}:${targetPort}`);
-      callback(targetHost, targetPort);
+
+      // Resolve domain directly to IPv4 to bypass Render cloud DNS hangs
+      resolver.resolve4(targetHost, (err4, ips) => {
+        if (!err4 && ips && ips.length > 0) {
+          console.log(`[DNS] Resolved IPv4: ${ips[0]}:${targetPort}`);
+          callback(ips[0], targetPort);
+        } else {
+          callback(targetHost, targetPort);
+        }
+      });
     } else {
       console.log(`[DNS] Fallback direct: ${cleanHost}:${config.server.port}`);
-      callback(cleanHost, Number(config.server.port) || 13111);
+      resolver.resolve4(cleanHost, (err4, ips) => {
+        const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : cleanHost;
+        callback(directIp, Number(config.server.port) || 13111);
+      });
     }
   });
 }
@@ -134,6 +146,7 @@ function createBot() {
         auth: 'offline',
         viewDistance: 'tiny',
         hideErrors: true,
+        connectTimeout: 20000,
         checkTimeoutInterval: 60000,
         keepAlive: true,
         closeTimeout: 60000,
@@ -148,7 +161,7 @@ function createBot() {
           console.log('[Bot] Handshake timeout. Retrying...');
           cleanupAndReconnect();
         }
-      }, 35000);
+      }, 25000);
 
       bot.once('login', () => {
         console.log('[Bot] Handshake verified, logging in...');
