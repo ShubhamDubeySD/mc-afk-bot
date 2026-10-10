@@ -98,10 +98,9 @@ function createBot() {
     bot = null;
   }
 
-  // Direct exact server IP aur Port (SRV issue bypass)
   const targetHost = config.server?.ip || 'royalsmp13111.aternos.me';
   const targetPort = Number(config.server?.port) || 13111;
-  const selectedVersion = config.server?.version || '1.21.1';
+  const selectedVersion = config.server?.version || '1.21.4';
 
   console.log(`[Bot] Connecting to ${targetHost}:${targetPort} (Version: ${selectedVersion})...`);
 
@@ -207,14 +206,12 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
-  // Hand arm swing
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
   }, 5000);
 
-  // Chat message & /lagg gc routine
   if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
     const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
@@ -235,33 +232,12 @@ function initializeModules(bot) {
         }
       };
 
-      // Spawn hone ke 5 second baad turant pehli bar bhejega
       setTimeout(sendChatRoutine, 5000);
-
-      // Uske baad har settings interval (300 sec) par repeat karega
       const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 300) * 1000;
       addInterval(sendChatRoutine, chatDelay);
     }
   }
 
-  // Anti-AFK sneak
-  if (config.utils && config.utils['anti-afk'] && config.utils['anti-afk'].enabled && config.utils['anti-afk'].sneak) {
-    try { bot.setControlState('sneak', true); } catch (e) {}
-  }
-
-  // Random jump
-  if (config.movement && config.movement['random-jump'] && config.movement['random-jump'].enabled) {
-    const jumpInterval = config.movement['random-jump'].interval || 8000;
-    addInterval(() => {
-      if (!bot || !botState.connected) return;
-      try {
-        bot.setControlState('jump', true);
-        setTimeout(() => { if (bot) bot.setControlState('jump', false); }, 300);
-      } catch (e) {}
-    }, jumpInterval);
-  }
-
-  // Look around
   if (config.movement && config.movement['look-around'] && config.movement['look-around'].enabled) {
     const lookInterval = config.movement['look-around'].interval || 4000;
     addInterval(() => {
@@ -278,9 +254,11 @@ function initializeModules(bot) {
 }
 
 process.on('uncaughtException', (err) => {
+  if (err && err.message && err.message.includes('unknown chat format code')) {
+    return;
+  }
   console.log(`[FATAL] Uncaught: ${err.message}`);
   cleanupAndReconnect();
 });
 
 createBot();
-                  
