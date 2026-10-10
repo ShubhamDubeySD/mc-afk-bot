@@ -113,9 +113,9 @@ function createBot() {
       auth: 'offline',
       viewDistance: 'tiny',
       hideErrors: true,
-      connectTimeout: 30000,
-      keepAlive: true,
-      checkTimeoutInterval: 0 // Client timeout completely disabled
+      connectTimeout: 45000,
+      checkTimeoutInterval: 120000, // 2-minute safe buffer
+      keepAlive: true
     });
 
     bot.loadPlugin(pathfinder);
@@ -162,7 +162,7 @@ function createBot() {
     });
 
     bot.on('error', (err) => {
-      if (err.code === 'ECONNRESET') return;
+      if (err && (err.code === 'ECONNRESET' || err.message?.includes('ECONNRESET'))) return;
       console.log(`[Bot] Error: ${err.message}`);
       cleanupAndReconnect();
     });
@@ -205,14 +205,14 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
-  // 1. Swing arm every 3s
+  // Swing arm every 3s
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
   }, 3000);
 
-  // 2. Chat message & command
+  // Chat message & command routine
   if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
     const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
@@ -239,7 +239,7 @@ function initializeModules(bot) {
     }
   }
 
-  // 3. Smooth Look around
+  // Smooth Look around
   if (config.movement && config.movement['look-around'] && config.movement['look-around'].enabled) {
     const lookInterval = config.movement['look-around'].interval || 4000;
     addInterval(() => {
@@ -257,10 +257,10 @@ function initializeModules(bot) {
 
 // Global Exception Handler
 process.on('uncaughtException', (err) => {
-  if (err) {
-    if ((err.message && err.message.includes('unknown chat format code')) || 
-        (err.message && err.message.includes('ECONNRESET')) || 
-        err.code === 'ECONNRESET') {
+  if (err && err.message) {
+    if (err.message.includes('unknown chat format code') || 
+        err.message.includes('ECONNRESET') || 
+        err.message.includes('PartialReadError')) {
       return;
     }
   }
