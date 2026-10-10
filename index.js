@@ -115,19 +115,10 @@ function createBot() {
       hideErrors: true,
       connectTimeout: 30000,
       keepAlive: true,
-      checkTimeoutInterval: 30000 // 30s ping standard for Aternos
+      checkTimeoutInterval: 0 // Client timeout completely disabled
     });
 
     bot.loadPlugin(pathfinder);
-
-    // Socket keepalive error handler
-    if (bot._client) {
-      bot._client.on('error', (err) => {
-        if (err.code === 'ECONNRESET') {
-          console.log('[Bot] Ignored ECONNRESET from socket');
-        }
-      });
-    }
 
     if (connectWatchdogId) clearTimeout(connectWatchdogId);
     connectWatchdogId = setTimeout(() => {
@@ -214,14 +205,14 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
-  // Continuous arm swing to keep socket alive
+  // 1. Swing arm every 3s
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
   }, 3000);
 
-  // Periodic Chat message & command
+  // 2. Chat message & command
   if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
     const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
@@ -248,7 +239,7 @@ function initializeModules(bot) {
     }
   }
 
-  // Smooth Look around (Anti-AFK)
+  // 3. Smooth Look around
   if (config.movement && config.movement['look-around'] && config.movement['look-around'].enabled) {
     const lookInterval = config.movement['look-around'].interval || 4000;
     addInterval(() => {
@@ -264,7 +255,7 @@ function initializeModules(bot) {
   console.log('[Modules] All automation active.');
 }
 
-// Global Exception Handler - Ignores specific harmless errors
+// Global Exception Handler
 process.on('uncaughtException', (err) => {
   if (err) {
     if ((err.message && err.message.includes('unknown chat format code')) || 
