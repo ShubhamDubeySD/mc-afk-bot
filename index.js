@@ -112,15 +112,22 @@ function createBot() {
       version: selectedVersion,
       auth: 'offline',
       viewDistance: 'tiny',
-      hideErrors: false,
-      connectTimeout: 45000,
-      checkTimeoutInterval: 120000,
+      hideErrors: true,
+      connectTimeout: 30000,
       keepAlive: true,
-      closeTimeout: 120000,
-      noPong: false
+      checkTimeoutInterval: 30000 // 30s ping standard for Aternos
     });
 
     bot.loadPlugin(pathfinder);
+
+    // Socket keepalive error handler
+    if (bot._client) {
+      bot._client.on('error', (err) => {
+        if (err.code === 'ECONNRESET') {
+          console.log('[Bot] Ignored ECONNRESET from socket');
+        }
+      });
+    }
 
     if (connectWatchdogId) clearTimeout(connectWatchdogId);
     connectWatchdogId = setTimeout(() => {
@@ -164,6 +171,7 @@ function createBot() {
     });
 
     bot.on('error', (err) => {
+      if (err.code === 'ECONNRESET') return;
       console.log(`[Bot] Error: ${err.message}`);
       cleanupAndReconnect();
     });
@@ -256,11 +264,16 @@ function initializeModules(bot) {
   console.log('[Modules] All automation active.');
 }
 
+// Global Exception Handler - Ignores specific harmless errors
 process.on('uncaughtException', (err) => {
-  if (err && err.message && err.message.includes('unknown chat format code')) {
-    return;
+  if (err) {
+    if ((err.message && err.message.includes('unknown chat format code')) || 
+        (err.message && err.message.includes('ECONNRESET')) || 
+        err.code === 'ECONNRESET') {
+      return;
+    }
   }
-  console.log(`[FATAL] Uncaught: ${err.message}`);
+  console.log(`[FATAL] Uncaught: ${err ? err.message : 'Unknown'}`);
   cleanupAndReconnect();
 });
 
