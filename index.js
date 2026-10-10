@@ -99,7 +99,8 @@ function createBot() {
   }
 
   const targetHost = config.server?.ip || 'royalsmp13111.aternos.me';
-  const targetPort = Number(config.server?.port) || 13111;
+  // Standard port 25565 enables automatic SRV record resolution
+  const targetPort = Number(config.server?.port) || 25565;
   const selectedVersion = config.server?.version || '1.21.4';
 
   console.log(`[Bot] Connecting to ${targetHost}:${targetPort} (Version: ${selectedVersion})...`);
@@ -114,7 +115,7 @@ function createBot() {
       viewDistance: 'tiny',
       hideErrors: true,
       connectTimeout: 45000,
-      checkTimeoutInterval: 120000, // 2-minute safe buffer
+      checkTimeoutInterval: 120000,
       keepAlive: true
     });
 
