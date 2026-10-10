@@ -1,6 +1,5 @@
 'use strict';
 
-const dns = require('dns');
 const mineflayer = require('mineflayer');
 const { Movements, pathfinder } = require('mineflayer-pathfinder');
 const config = require('./settings.json');
@@ -87,28 +86,6 @@ function addInterval(callback, delay) {
   return id;
 }
 
-function resolveServer(callback) {
-  const rawHost = config.server?.ip || 'royalsmp13111.aternos.me';
-  const cleanHost = rawHost.replace(/:\d+$/, '').trim().toLowerCase();
-  const srvHost = `_minecraft._tcp.${cleanHost}`;
-  console.log(`[DNS] Checking live SRV record for ${srvHost}...`);
-
-  const resolver = new dns.Resolver();
-  resolver.setServers(['8.8.8.8', '1.1.1.1']);
-
-  resolver.resolveSrv(srvHost, (err, addresses) => {
-    if (!err && addresses && addresses.length > 0) {
-      const srvPort = addresses[0].port;
-      console.log(`[DNS] Live resolved port via SRV: ${srvPort}`);
-      callback(cleanHost, srvPort);
-    } else {
-      const fallbackPort = Number(config.server?.port) || 13111;
-      console.log(`[DNS] Fallback port: ${fallbackPort}`);
-      callback(cleanHost, fallbackPort);
-    }
-  });
-}
-
 function createBot() {
   if (isReconnecting) return;
 
@@ -121,79 +98,81 @@ function createBot() {
     bot = null;
   }
 
-  resolveServer((domainHost, targetPort) => {
-    const selectedVersion = '1.21.4';
-    console.log(`[Bot] Connecting to ${domainHost}:${targetPort} (Version: ${selectedVersion})...`);
+  // Direct exact server IP aur Port (SRV issue bypass)
+  const targetHost = config.server?.ip || 'royalsmp13111.aternos.me';
+  const targetPort = Number(config.server?.port) || 13111;
+  const selectedVersion = config.server?.version || '1.21.1';
 
-    try {
-      bot = mineflayer.createBot({
-        username: config['bot-account']?.username || 'Welcome',
-        host: domainHost,
-        port: targetPort,
-        version: selectedVersion,
-        auth: 'offline',
-        viewDistance: 'tiny',
-        hideErrors: false,
-        connectTimeout: 30000,
-        checkTimeoutInterval: 60000,
-        keepAlive: true,
-        closeTimeout: 60000,
-        noPong: false
-      });
+  console.log(`[Bot] Connecting to ${targetHost}:${targetPort} (Version: ${selectedVersion})...`);
 
-      bot.loadPlugin(pathfinder);
+  try {
+    bot = mineflayer.createBot({
+      username: config['bot-account']?.username || 'Welcome',
+      host: targetHost,
+      port: targetPort,
+      version: selectedVersion,
+      auth: 'offline',
+      viewDistance: 'tiny',
+      hideErrors: false,
+      connectTimeout: 30000,
+      checkTimeoutInterval: 60000,
+      keepAlive: true,
+      closeTimeout: 60000,
+      noPong: false
+    });
 
+    bot.loadPlugin(pathfinder);
+
+    if (connectWatchdogId) clearTimeout(connectWatchdogId);
+    connectWatchdogId = setTimeout(() => {
+      if (!botState.connected) {
+        console.log('[Bot] Handshake timeout. Retrying...');
+        cleanupAndReconnect();
+      }
+    }, 35000);
+
+    bot.once('login', () => {
+      console.log('[Bot] Handshake verified, logged in successfully!');
+    });
+
+    bot.once('spawn', () => {
       if (connectWatchdogId) clearTimeout(connectWatchdogId);
-      connectWatchdogId = setTimeout(() => {
-        if (!botState.connected) {
-          console.log('[Bot] Handshake timeout. Retrying...');
-          cleanupAndReconnect();
-        }
-      }, 35000);
+      botState.connected = true;
+      botState.lastActivity = Date.now();
+      botState.reconnectAttempts = 0;
+      isReconnecting = false;
 
-      bot.once('login', () => {
-        console.log('[Bot] Handshake verified, logged in successfully!');
-      });
+      console.log(`[Bot] Spawned successfully as ${bot.username}!`);
 
-      bot.once('spawn', () => {
-        if (connectWatchdogId) clearTimeout(connectWatchdogId);
-        botState.connected = true;
-        botState.lastActivity = Date.now();
-        botState.reconnectAttempts = 0;
-        isReconnecting = false;
+      try {
+        const mcData = require('minecraft-data')(bot.version);
+        const defaultMove = new Movements(bot, mcData);
+        defaultMove.allowFreeMotion = false;
+        defaultMove.canDig = false;
+      } catch (e) {}
 
-        console.log(`[Bot] Spawned successfully as ${bot.username}!`);
+      initializeModules(bot);
+    });
 
-        try {
-          const mcData = require('minecraft-data')(bot.version);
-          const defaultMove = new Movements(bot, mcData);
-          defaultMove.allowFreeMotion = false;
-          defaultMove.canDig = false;
-        } catch (e) {}
-
-        initializeModules(bot);
-      });
-
-      bot.on('kicked', (reason) => {
-        console.log(`[Bot] Kicked: ${JSON.stringify(reason)}`);
-        cleanupAndReconnect();
-      });
-
-      bot.on('end', (reason) => {
-        console.log(`[Bot] Disconnected: ${reason || 'Unknown'}`);
-        cleanupAndReconnect();
-      });
-
-      bot.on('error', (err) => {
-        console.log(`[Bot] Error: ${err.message}`);
-        cleanupAndReconnect();
-      });
-
-    } catch (err) {
-      console.log(`[Bot] Init error: ${err.message}`);
+    bot.on('kicked', (reason) => {
+      console.log(`[Bot] Kicked: ${JSON.stringify(reason)}`);
       cleanupAndReconnect();
-    }
-  });
+    });
+
+    bot.on('end', (reason) => {
+      console.log(`[Bot] Disconnected: ${reason || 'Unknown'}`);
+      cleanupAndReconnect();
+    });
+
+    bot.on('error', (err) => {
+      console.log(`[Bot] Error: ${err.message}`);
+      cleanupAndReconnect();
+    });
+
+  } catch (err) {
+    console.log(`[Bot] Init error: ${err.message}`);
+    cleanupAndReconnect();
+  }
 }
 
 function cleanupAndReconnect() {
@@ -228,18 +207,19 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
+  // Hand arm swing
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
   }, 5000);
 
+  // Chat message & /lagg gc routine
   if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
     const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
     if (messages.length > 0) {
-      const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 300) * 1000;
-      addInterval(() => {
+      const sendChatRoutine = () => {
         if (bot && botState.connected) {
           bot.chat(messages[i]);
           console.log(`[Chat] Sent: ${messages[i]}`);
@@ -253,14 +233,23 @@ function initializeModules(bot) {
 
           i = (i + 1) % messages.length;
         }
-      }, chatDelay);
+      };
+
+      // Spawn hone ke 5 second baad turant pehli bar bhejega
+      setTimeout(sendChatRoutine, 5000);
+
+      // Uske baad har settings interval (300 sec) par repeat karega
+      const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 300) * 1000;
+      addInterval(sendChatRoutine, chatDelay);
     }
   }
 
+  // Anti-AFK sneak
   if (config.utils && config.utils['anti-afk'] && config.utils['anti-afk'].enabled && config.utils['anti-afk'].sneak) {
     try { bot.setControlState('sneak', true); } catch (e) {}
   }
 
+  // Random jump
   if (config.movement && config.movement['random-jump'] && config.movement['random-jump'].enabled) {
     const jumpInterval = config.movement['random-jump'].interval || 8000;
     addInterval(() => {
@@ -272,6 +261,7 @@ function initializeModules(bot) {
     }, jumpInterval);
   }
 
+  // Look around
   if (config.movement && config.movement['look-around'] && config.movement['look-around'].enabled) {
     const lookInterval = config.movement['look-around'].interval || 4000;
     addInterval(() => {
@@ -293,4 +283,4 @@ process.on('uncaughtException', (err) => {
 });
 
 createBot();
-        
+                  
