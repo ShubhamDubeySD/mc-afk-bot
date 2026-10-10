@@ -113,10 +113,10 @@ function createBot() {
       auth: 'offline',
       viewDistance: 'tiny',
       hideErrors: false,
-      connectTimeout: 30000,
-      checkTimeoutInterval: 60000,
+      connectTimeout: 45000,
+      checkTimeoutInterval: 120000,
       keepAlive: true,
-      closeTimeout: 60000,
+      closeTimeout: 120000,
       noPong: false
     });
 
@@ -128,7 +128,7 @@ function createBot() {
         console.log('[Bot] Handshake timeout. Retrying...');
         cleanupAndReconnect();
       }
-    }, 35000);
+    }, 45000);
 
     bot.once('login', () => {
       console.log('[Bot] Handshake verified, logged in successfully!');
@@ -206,12 +206,14 @@ function scheduleReconnect() {
 }
 
 function initializeModules(bot) {
+  // Continuous arm swing to keep socket alive
   addInterval(() => {
     if (bot && botState.connected) {
       try { bot.swingArm(); } catch (e) {}
     }
-  }, 5000);
+  }, 3000);
 
+  // Periodic Chat message & command
   if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
     const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
@@ -238,6 +240,7 @@ function initializeModules(bot) {
     }
   }
 
+  // Smooth Look around (Anti-AFK)
   if (config.movement && config.movement['look-around'] && config.movement['look-around'].enabled) {
     const lookInterval = config.movement['look-around'].interval || 4000;
     addInterval(() => {
