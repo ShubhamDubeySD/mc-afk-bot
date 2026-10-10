@@ -3,15 +3,15 @@
   "server": {
     "ip": "royalsmp13111.aternos.me",
     "port": 13111,
-    "version": "1.21.1"
+    "version": "1.21.4"
   },
   "bot-account": {
     "username": "Welcome"
   },
   "utils": {
     "anti-afk": {
-      "enabled": true,
-      "sneak": true
+      "enabled": false,
+      "sneak": false
     },
     "chat-messages": {
       "enabled": true,
@@ -23,7 +23,7 @@
   },
   "movement": {
     "random-jump": {
-      "enabled": true,
+      "enabled": false,
       "interval": 8000
     },
     "look-around": {
