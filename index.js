@@ -104,7 +104,7 @@ function resolveServer(callback) {
 
       resolver.resolve4(srvTarget, (err4, ips) => {
         const directIp = (!err4 && ips && ips.length > 0) ? ips[0] : srvTarget;
-        console.log(`[DNS] Resolved target: ${directIp}:${srvPort} with virtual host: ${cleanHost}`);
+        console.log(`[DNS] Target IP: ${directIp}:${srvPort} (Virtual Host: ${cleanHost})`);
         callback(directIp, srvPort, cleanHost);
       });
     } else {
@@ -130,7 +130,7 @@ function createBot() {
   }
 
   resolveServer((connectHost, port, virtualHost) => {
-    console.log(`[Bot] Initiating connection to ${connectHost}:${port} (Virtual Host: ${virtualHost})...`);
+    console.log(`[Bot] Connecting to ${connectHost}:${port} (Virtual Host: ${virtualHost})...`);
 
     try {
       bot = mineflayer.createBot({
@@ -138,7 +138,7 @@ function createBot() {
         host: connectHost,
         port: port,
         fakeHost: virtualHost,
-        version: false, // Auto-negotiates protocol version with PaperMC
+        version: false,
         auth: 'offline',
         viewDistance: 'tiny',
         hideErrors: false,
@@ -154,13 +154,13 @@ function createBot() {
       if (connectWatchdogId) clearTimeout(connectWatchdogId);
       connectWatchdogId = setTimeout(() => {
         if (!botState.connected) {
-          console.log('[Bot] Handshake watchdog timeout. Reconnecting...');
+          console.log('[Bot] Handshake timeout. Retrying...');
           cleanupAndReconnect();
         }
       }, 35000);
 
       bot.once('login', () => {
-        console.log('[Bot] Handshake verified, logged in!');
+        console.log('[Bot] Logged in successfully!');
       });
 
       bot.once('spawn', () => {
@@ -242,41 +242,46 @@ function initializeModules(bot) {
     }
   }, 5000);
 
-  if (config.utils?.['chat-messages']?.enabled) {
-    const messages = config.utils['chat-messages'].messages;
+  if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
+    const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
-    addInterval(() => {
-      if (bot && botState.connected) {
-        bot.chat(messages[i]);
-        console.log(`[Chat] Sent: ${messages[i]}`);
+    if (messages.length > 0) {
+      const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 300) * 1000;
+      addInterval(() => {
+        if (bot && botState.connected) {
+          bot.chat(messages[i]);
+          console.log(`[Chat] Sent: ${messages[i]}`);
 
-        setTimeout(() => {
-          if (bot && botState.connected) {
-            bot.chat('/lagg gc');
-            console.log('[Command] Sent: /lagg gc');
-          }
-        }, 2000);
+          setTimeout(() => {
+            if (bot && botState.connected) {
+              bot.chat('/lagg gc');
+              console.log('[Command] Sent: /lagg gc');
+            }
+          }, 2000);
 
-        i = (i + 1) % messages.length;
-      }
-    }, (config.utils['chat-messages']['repeat-delay'] || 300) * 1000);
+          i = (i + 1) % messages.length;
+        }
+      }, chatDelay);
+    }
   }
 
-  if (config.utils?.['anti-afk']?.enabled && config.utils['anti-afk'].sneak) {
+  if (config.utils && config.utils['anti-afk'] && config.utils['anti-afk'].enabled && config.utils['anti-afk'].sneak) {
     try { bot.setControlState('sneak', true); } catch (e) {}
   }
 
-  if (config.movement?.['random-jump']?.enabled) {
+  if (config.movement && config.movement['random-jump'] && config.movement['random-jump'].enabled) {
+    const jumpInterval = config.movement['random-jump'].interval || 8000;
     addInterval(() => {
       if (!bot || !botState.connected) return;
       try {
         bot.setControlState('jump', true);
         setTimeout(() => { if (bot) bot.setControlState('jump', false); }, 300);
       } catch (e) {}
-    }, config.movement['random-jump'].interval || 8000);
+    }, jumpInterval);
   }
 
-  if (config.movement?.['look-around']?.enabled) {
+  if (config.movement && config.movement['look-around'] && config.movement['look-around'].enabled) {
+    const lookInterval = config.movement['look-around'].interval || 4000;
     addInterval(() => {
       if (!bot || !botState.connected) return;
       try {
@@ -284,4 +289,16 @@ function initializeModules(bot) {
         const pitch = (Math.random() * Math.PI / 2) - Math.PI / 4;
         bot.look(yaw, pitch, false);
       } catch (e) {}
-    }, config
+    }, lookInterval);
+  }
+
+  console.log('[Modules] All automation active.');
+}
+
+process.on('uncaughtException', (err) => {
+  console.log(`[FATAL] Uncaught: ${err.message}`);
+  cleanupAndReconnect();
+});
+
+createBot();
+  
