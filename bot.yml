@@ -3,9 +3,9 @@ name: Run AFK Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */5 * * *' # Har 5 ghante par auto-restart
+    # Test ke liye har 2 minute par trigger (Baad mein isko '0 */5 * * *' kar dena)
+    - cron: '*/2 * * * *'
 
-# Agar nayi run start ho, toh purani run ko gracefully cancel karega
 concurrency:
   group: afk-bot-group
   cancel-in-progress: true
@@ -13,7 +13,8 @@ concurrency:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 320 # 5 ghante 20 minute ke baad safe auto-close
+    # Test ke liye timeout 5 minute rakh diya hai
+    timeout-minutes: 5 
 
     steps:
       - name: Checkout repo
