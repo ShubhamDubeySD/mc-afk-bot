@@ -15,7 +15,7 @@
     },
     "chat-messages": {
       "enabled": true,
-      "repeat-delay": 300,
+      "repeat-delay": 1800,
       "messages": [
         "Welcome everyone to the server! This server is created by Shubham2652!"
       ]
