@@ -99,8 +99,7 @@ function createBot() {
   }
 
   const targetHost = config.server?.ip || 'royalsmp13111.aternos.me';
-  // Standard port 25565 enables automatic SRV record resolution
-  const targetPort = Number(config.server?.port) || 25565;
+  const targetPort = Number(config.server?.port) || 13111;
   const selectedVersion = config.server?.version || '1.21.4';
 
   console.log(`[Bot] Connecting to ${targetHost}:${targetPort} (Version: ${selectedVersion})...`);
@@ -213,7 +212,7 @@ function initializeModules(bot) {
     }
   }, 3000);
 
-  // Chat message & command routine
+  // Chat message & command routine (Har 30 minute par)
   if (config.utils && config.utils['chat-messages'] && config.utils['chat-messages'].enabled) {
     const messages = config.utils['chat-messages'].messages || [];
     let i = 0;
@@ -228,14 +227,15 @@ function initializeModules(bot) {
               bot.chat('/lagg gc');
               console.log('[Command] Sent: /lagg gc');
             }
-          }, 2000);
+          }, 3000);
 
           i = (i + 1) % messages.length;
         }
       };
 
-      setTimeout(sendChatRoutine, 5000);
-      const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 300) * 1000;
+      // Turant send nahi karega taaki reconnect loop na bane
+      // Seedha pure 30 minute ke delay ke baad hi run hoga
+      const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 1800) * 1000;
       addInterval(sendChatRoutine, chatDelay);
     }
   }
