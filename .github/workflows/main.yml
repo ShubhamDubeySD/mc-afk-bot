@@ -7,11 +7,14 @@ concurrency:
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */5 * * *'
+    # Har 4 ghante 30 minute par auto-trigger (6 ghante ki limit aane se pehle hi naya bot bhej dega)
+    - cron: '30 */4 * * *'
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 320 # 5 ghante 20 minute safe cutoff limit
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
