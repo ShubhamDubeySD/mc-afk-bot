@@ -6,6 +6,7 @@ const config = require('./settings.json');
 const express = require('express');
 
 const app = express();
+// Render automatically process.env.PORT assign karta hai
 const PORT = process.env.PORT || 10000;
 
 let bot = null;
@@ -21,6 +22,7 @@ let botState = {
   startTime: Date.now()
 };
 
+// Render web health check aur monitoring dashboard
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -69,10 +71,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/ping', (req, res) => res.send('pong'));
+// UptimeRobot ya Cron-job ke ping ke liye ultra-light route
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Server] Web server listening on port ${PORT}`);
+  console.log(`[Server] Web server active on port ${PORT}`);
 });
 
 function clearAllIntervals() {
@@ -233,8 +238,6 @@ function initializeModules(bot) {
         }
       };
 
-      // Turant send nahi karega taaki reconnect loop na bane
-      // Seedha pure 30 minute ke delay ke baad hi run hoga
       const chatDelay = (config.utils['chat-messages']['repeat-delay'] || 1800) * 1000;
       addInterval(sendChatRoutine, chatDelay);
     }
