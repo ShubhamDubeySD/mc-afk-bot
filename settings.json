@@ -2,7 +2,7 @@
   "name": "AFK Bot",
   "server": {
     "ip": "royalsmp13111.aternos.me",
-    "port": 13111,
+    "port": 25565,
     "version": "1.21.4"
   },
   "bot-account": {
