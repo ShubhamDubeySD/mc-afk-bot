@@ -9,10 +9,6 @@
     "username": "Welcome"
   },
   "utils": {
-    "anti-afk": {
-      "enabled": false,
-      "sneak": false
-    },
     "chat-messages": {
       "enabled": true,
       "repeat-delay": 1800,
@@ -22,10 +18,6 @@
     }
   },
   "movement": {
-    "random-jump": {
-      "enabled": false,
-      "interval": 8000
-    },
     "look-around": {
       "enabled": true,
       "interval": 4000
